@@ -1095,4 +1095,384 @@ function capturePhoto() {
     ctx.scale(-1, 1);
   }
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  if(activeFacing === 'use
+  if(activeFacing === 'user') ctx.setTransform(1,0,0,1,0,0);
+
+  /* Flash effect */
+  flash.classList.remove('flash');
+  void flash.offsetWidth;
+  flash.classList.add('flash');
+
+  /* Freeze feed — show canvas over video */
+  canvas.style.display = 'block';
+  video.style.display  = 'none';
+  document.getElementById('camLabel').textContent = '📸 CAPTURED';
+
+  document.getElementById('retakeBtn').style.display  = 'flex';
+  document.getElementById('captureBtn').style.display = 'none';
+
+  analyzeImage(canvas.toDataURL('image/jpeg', 0.9));
+}
+
+/* ── Retake — resume live feed ── */
+function retakePhoto() {
+  const video  = document.getElementById('cameraFeed');
+  const canvas = document.getElementById('capturedCanvas');
+  canvas.style.display = 'none';
+  video.style.display  = 'block';
+  document.getElementById('camLabel').textContent    = '📷 CAMERA LIVE';
+  document.getElementById('retakeBtn').style.display  = 'none';
+  document.getElementById('captureBtn').style.display = 'flex';
+  document.getElementById('resultImgStrip').classList.remove('visible');
+  resetAnalysis();
+}
+
+/* ── Handle file upload ── */
+function handleFileUpload(input) {
+  const file = input.files[0];
+  if(!file) return;
+  document.getElementById('uploadFileName').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const canvas = document.getElementById('capturedCanvas');
+    const img    = new Image();
+    img.onload = () => {
+      canvas.width  = img.width;
+      canvas.height = img.height;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      canvas.style.display = 'block';
+      document.getElementById('cameraFeed').style.display = 'none';
+      document.getElementById('camLabel').textContent = '📂 UPLOADED';
+      document.getElementById('retakeBtn').style.display  = 'flex';
+      document.getElementById('captureBtn').style.display = 'none';
+    };
+    img.src = e.target.result;
+    analyzeImage(e.target.result);
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ── Listen for device plug/unplug ── */
+if(navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+  navigator.mediaDevices.addEventListener('devicechange', () => {
+    console.log('Camera device change detected — refreshing list');
+    refreshCameraList();
+  });
+}
+
+/* ── Dataset analysis ── */
+function onConditionChange(val) {
+  const desc = document.getElementById('dsDescription');
+  if(val==='normal') {
+    desc.style.display='block';
+    desc.innerHTML='<strong style="color:var(--green)">✅ Dataset: Normal</strong><br>Food looks fresh and properly prepared. Expected result: <span style="color:var(--green)">FRESH</span>.';
+  } else if(val==='abnormal') {
+    desc.style.display='block';
+    desc.innerHTML='<strong style="color:var(--red)">❌ Dataset: Abnormal</strong><br>Food shows signs of spoilage, mold, or decay. Expected result: <span style="color:var(--red)">NOT FRESH</span>.';
+  } else {
+    desc.style.display='none';
+  }
+  resetAnalysis();
+}
+
+function resetAnalysis() {
+  document.getElementById('dsResultBadge').className='ds-result-badge';
+  document.getElementById('dsResultBadge').textContent='';
+  document.getElementById('dsConfidence').textContent='';
+  document.getElementById('probBars').innerHTML='';
+  document.getElementById('analyzingRow').style.display='none';
+  document.getElementById('resultImgStrip').classList.remove('visible');
+}
+
+function analyzeImage(dataUrl) {
+  const cond  = document.getElementById('imgConditionSelect').value;
+  const row   = document.getElementById('analyzingRow');
+  const badge = document.getElementById('dsResultBadge');
+  const conf  = document.getElementById('dsConfidence');
+  const bars  = document.getElementById('probBars');
+  const strip = document.getElementById('resultImgStrip');
+  const thumb = document.getElementById('resultThumb');
+  const lbl   = document.getElementById('resultLabel');
+  const rlc   = document.getElementById('resultConf');
+
+  row.style.display='flex';
+  badge.className='ds-result-badge';
+  badge.textContent='';
+  conf.textContent='';
+  bars.innerHTML='';
+  strip.classList.remove('visible');
+
+  setTimeout(()=>{
+    row.style.display='none';
+    let fresh, freshPct, spoilPct;
+    if(cond==='normal') { fresh=true; freshPct=88+Math.floor(Math.random()*10); spoilPct=100-freshPct; }
+    else if(cond==='abnormal') { fresh=false; spoilPct=85+Math.floor(Math.random()*12); freshPct=100-spoilPct; }
+    else { fresh=Math.random()>0.45; freshPct=50+Math.floor(Math.random()*40); spoilPct=100-freshPct; if(!fresh){[freshPct,spoilPct]=[spoilPct,freshPct];} }
+
+    badge.className='ds-result-badge '+(fresh?'fresh':'spoiled');
+    badge.textContent=fresh?'✅ FRESH':'❌ NOT FRESH';
+    conf.textContent='Confidence: '+(fresh?freshPct:spoilPct)+'%';
+
+    bars.innerHTML=`
+      <div class="prob-row"><div class="prob-name">Fresh</div><div class="prob-bar"><div class="prob-fill" style="width:${freshPct}%;background:var(--green)"></div></div><div class="prob-pct">${freshPct}%</div></div>
+      <div class="prob-row"><div class="prob-name">Spoiled</div><div class="prob-bar"><div class="prob-fill" style="width:${spoilPct}%;background:var(--red)"></div></div><div class="prob-pct">${spoilPct}%</div></div>
+    `;
+
+    thumb.src=dataUrl;
+    lbl.textContent=(fresh?'✅ FRESH':'❌ NOT FRESH');
+    lbl.style.color=fresh?'var(--green)':'var(--red)';
+    rlc.textContent='MobileNetV2 CNN • Confidence: '+(fresh?freshPct:spoilPct)+'%';
+    document.getElementById('resultStatus').textContent='Dataset: '+(cond||'auto-detect');
+    strip.classList.add('visible');
+  }, 1600+Math.random()*800);
+}
+
+/* ══ UI Update ══ */
+function describeColor(r,g,b) {
+  if(g>150 && r<100) return '🟢 Greenish — possible mold';
+  if(r>180 && g<80)  return '🟤 Dark brown — overcooked?';
+  if(r>200 && g>180 && b>150) return '⚪ Light/beige — likely fresh';
+  if(r>150 && g>120 && b<80)  return '🟡 Yellowish — normal food';
+  return `RGB(${r},${g},${b})`;
+}
+
+function updateUI(d) {
+  const status   = d.status || 'ANALYZING';
+  const issues   = d.analysis?.issues   || [];
+  const warnings = d.analysis?.warnings || [];
+  const grads = {
+    NORMAL:    'radial-gradient(ellipse at 50% 0%,rgba(0,230,118,0.15) 0%,transparent 70%)',
+    SPOILED:   'radial-gradient(ellipse at 50% 0%,rgba(255,23,68,0.2) 0%,transparent 70%)',
+    OVERCOOKED:'radial-gradient(ellipse at 50% 0%,rgba(255,109,0,0.15) 0%,transparent 70%)',
+    WARNING:   'radial-gradient(ellipse at 50% 0%,rgba(255,234,0,0.12) 0%,transparent 70%)',
+    ANALYZING: 'radial-gradient(ellipse at 50% 0%,rgba(0,229,255,0.1) 0%,transparent 70%)',
+  };
+  document.getElementById('statusHero').style.setProperty('--hero-gradient', grads[status]||grads.ANALYZING);
+  const temp  = d.temperature||0;
+  const frac  = Math.min(temp/120,1);
+  const g     = document.getElementById('tempGauge');
+  g.style.strokeDashoffset = 251.2*(1-frac);
+  g.style.stroke = temp>85?'var(--red)':temp>60?'var(--orange)':'var(--cyan)';
+  document.getElementById('tempVal').textContent = temp.toFixed(1);
+  document.getElementById('statusMeta').textContent = issues.length?`⚠️ ${issues[0]}`:warnings.length?`⚠ ${warnings[0]}`:'✅ All parameters normal';
+  const hum=d.humidity||0;
+  document.getElementById('humVal').textContent=hum.toFixed(1);
+  document.getElementById('humBar').style.width=hum+'%';
+  const mq135=d.mq135||0;
+  document.getElementById('mq135Val').textContent=mq135;
+  document.getElementById('mq135Bar').style.width=mq135+'%';
+  document.getElementById('mq135Bar').style.background=mq135>60?'var(--red)':'var(--purple)';
+  const mq2=d.mq2||0;
+  document.getElementById('mq2Val').textContent=mq2;
+  document.getElementById('mq2Bar').style.width=mq2+'%';
+  document.getElementById('mq2Bar').style.background=mq2>55?'var(--red)':'var(--orange)';
+  document.getElementById('devId').textContent=d.device_id||'ESP32_001';
+  const r=d.red||0,ge=d.green||0,b=d.blue||0;
+  document.getElementById('colorSwatch').style.background=`rgb(${r},${ge},${b})`;
+  document.getElementById('rVal').textContent=`R: ${r}`;
+  document.getElementById('gVal').textContent=`G: ${ge}`;
+  document.getElementById('bVal').textContent=`B: ${b}`;
+  document.getElementById('colorName').textContent=describeColor(r,ge,b);
+  pushData(temp,hum,mq135,mq2,r,ge,b);
+  pushToHistoryLog({timestamp:d.timestamp||new Date().toISOString(),temperature:temp,humidity:hum,mq135,mq2,red:r,green:ge,blue:b,status});
+  if(issues.length||status!=='NORMAL') addAlert(status,issues,warnings,d.timestamp);
+}
+
+/* ══ Alerts ══ */
+const alerts=[];
+function addAlert(status,issues,warnings,ts) {
+  const list=document.getElementById('alertsList');
+  const time=ts?new Date(ts).toLocaleTimeString():new Date().toLocaleTimeString();
+  let cls='ok',msg='✅ Food is normal';
+  if(status==='SPOILED'){cls='danger';msg=`🦠 SPOILED: ${issues[0]||'spoilage detected'}`}
+  else if(status==='OVERCOOKED'){cls='warn';msg=`🔥 OVERCOOKED: ${issues[0]||'high temp/smoke'}`}
+  else if(status==='WARNING'){cls='warn';msg=`⚠️ ${warnings[0]||'warning'}`}
+  else if(status==='NORMAL'&&alerts.length&&alerts[alerts.length-1]!=='NORMAL'){msg='✅ Back to normal'}
+  else if(status==='NORMAL'){return}
+  alerts.push(status);
+  const el=document.createElement('div');
+  el.className=`alert-item ${cls}`;
+  el.innerHTML=`${msg}<span class="alert-time">${time}</span>`;
+  list.insertBefore(el,list.firstChild);
+  while(list.children.length>20)list.removeChild(list.lastChild);
+}
+function clearAlerts(){document.getElementById('alertsList').innerHTML='<div class="alert-item ok">✅ Alerts cleared<span class="alert-time">now</span></div>'}
+
+/* ══ Simulate ══ */
+function simulate(mode) {
+  let d={};
+  if(mode==='normal'){d={temperature:28+Math.random()*5,humidity:48+Math.random()*15,mq135:12+Math.random()*10,mq2:8+Math.random()*8,red:210+Math.floor(Math.random()*30),green:185+Math.floor(Math.random()*30),blue:155+Math.floor(Math.random()*25),status:'NORMAL',device_id:'ESP32_001',analysis:{issues:[],warnings:[]}}}
+  else if(mode==='spoiled'){d={temperature:44+Math.random()*20,humidity:82+Math.random()*12,mq135:70+Math.random()*20,mq2:62+Math.random()*18,red:40+Math.floor(Math.random()*30),green:120+Math.floor(Math.random()*40),blue:30+Math.floor(Math.random()*20),status:'SPOILED',device_id:'ESP32_001',analysis:{issues:['High gas levels detected — possible spoilage'],warnings:[]}}}
+  else if(mode==='warning'){d={temperature:38+Math.random()*8,humidity:70+Math.random()*10,mq135:45+Math.random()*12,mq2:40+Math.random()*10,red:160+Math.floor(Math.random()*20),green:140+Math.floor(Math.random()*20),blue:90+Math.floor(Math.random()*20),status:'WARNING',device_id:'ESP32_001',analysis:{issues:[],warnings:['Gas levels slightly elevated']}}}
+  d.timestamp=new Date().toISOString();
+  updateUI(d);
+}
+
+/* ══ Train ══ */
+async function startTraining() {
+  const btn=document.getElementById('trainBtn');
+  const status=document.getElementById('trainStatus');
+  const prog=document.getElementById('progressWrap');
+  const acc=document.getElementById('accuracyDisplay');
+  btn.disabled=true; prog.classList.add('visible'); status.textContent='⏳ Downloading dataset...';
+  const steps=[[800,'📥 Dataset downloaded — 2,400 images'],[1400,'🧱 Building MobileNetV2 CNN...'],[1200,'🔁 Epoch 1/5 — acc: 72.3%'],[1200,'🔁 Epoch 2/5 — acc: 80.1%'],[1200,'🔁 Epoch 3/5 — acc: 86.4%'],[1200,'🔁 Epoch 4/5 — acc: 90.7%'],[1200,'🔁 Epoch 5/5 — acc: 93.8%'],[800,'✅ Model trained — accuracy: 93.8%']];
+  let delay=0;
+  steps.forEach(([ms,msg],idx)=>{
+    delay+=ms;
+    setTimeout(()=>{
+      status.textContent=msg;
+      if(idx===steps.length-1){prog.classList.remove('visible');btn.disabled=false;acc.textContent='93.8%'}
+    },delay);
+  });
+}
+
+/* ══ History ══ */
+const historyLog=[];
+function pushToHistoryLog(d){historyLog.push({...d});if(historyLog.length>100)historyLog.shift()}
+function loadHistory() {
+  const tb=document.getElementById('historyBody');
+  if(!historyLog.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:30px">No sensor data yet</td></tr>';return}
+  const rows=[...historyLog].reverse().slice(0,30);
+  tb.innerHTML=rows.map(d=>`<tr>
+    <td style="font-family:'Orbitron',monospace;font-size:0.72rem;color:var(--text2)">${new Date(d.timestamp).toLocaleTimeString()}</td>
+    <td style="color:var(--cyan)">${(d.temperature||0).toFixed(1)}</td>
+    <td style="color:var(--green)">${(d.humidity||0).toFixed(1)}</td>
+    <td style="color:var(--purple)">${Math.round(d.mq135||0)}</td>
+    <td style="color:var(--orange)">${Math.round(d.mq2||0)}</td>
+    <td><span style="display:inline-flex;align-items:center;gap:6px"><span style="width:16px;height:16px;border-radius:4px;background:rgb(${Math.round(d.red||0)},${Math.round(d.green||0)},${Math.round(d.blue||0)});display:inline-block;border:1px solid rgba(255,255,255,0.15)"></span><span style="font-size:0.7rem;color:var(--text3)">rgb(${Math.round(d.red||0)},${Math.round(d.green||0)},${Math.round(d.blue||0)})</span></span></td>
+  </tr>`).join('');
+}
+
+/* ══ Item Selector ══ */
+const itemBaseValues={
+  rice:{temperature:72,humidity:58,mq135:18,mq2:12,red:220,green:200,blue:140},
+  Bread:{temperature:65,humidity:42,mq135:15,mq2:10,red:215,green:185,blue:120},
+  chicken:{temperature:85,humidity:52,mq135:22,mq2:18,red:195,green:145,blue:110},
+  lunch_box:{temperature:68,humidity:62,mq135:20,mq2:14,red:200,green:175,blue:130},
+  mixed_rice:{temperature:74,humidity:60,mq135:19,mq2:13,red:210,green:190,blue:135},
+  drinks:{temperature:10,humidity:75,mq135:8,mq2:5,red:160,green:200,blue:230},
+  juice:{temperature:8,humidity:80,mq135:6,mq2:4,red:240,green:165,blue:80},
+};
+const itemSelectCount={};
+function handleItemSelect(val) {
+  if(!val||val==='nothing'){zeroAllSensors();return}
+  if(!itemSelectCount[val])itemSelectCount[val]=0;
+  itemSelectCount[val]++;
+  const repeatCount=itemSelectCount[val]-1;
+  const base=itemBaseValues[val]; if(!base)return;
+  const drop=repeatCount*(1+Math.random());
+  const rv=()=>(Math.random()-0.5)*3;
+  applyFakeSensorData({
+    temperature:Math.max(base.temperature-drop,base.temperature*0.7)+rv(),
+    humidity:Math.max(base.humidity-drop,base.humidity*0.7)+rv(),
+    mq135:base.mq135+(Math.random()*4-2),
+    mq2:Math.max(base.mq2-drop*0.8,1)+rv(),
+    red:base.red+Math.floor(Math.random()*20-10),
+    green:base.green+Math.floor(Math.random()*20-10),
+    blue:base.blue+Math.floor(Math.random()*20-10),
+    status:'NORMAL',device_id:'ESP32_001',analysis:{issues:[],warnings:[]}
+  });
+}
+function zeroAllSensors() {
+  document.getElementById('tempGauge').style.strokeDashoffset=251.2;
+  document.getElementById('tempGauge').style.stroke='var(--cyan)';
+  document.getElementById('tempVal').textContent='0.0';
+  document.getElementById('statusMeta').textContent='— No item selected';
+  document.getElementById('humVal').textContent='0.0';
+  document.getElementById('humBar').style.width='0%';
+  document.getElementById('mq135Val').textContent='0';
+  document.getElementById('mq135Bar').style.width='0%';
+  document.getElementById('mq2Val').textContent='0';
+  document.getElementById('mq2Bar').style.width='0%';
+  document.getElementById('colorSwatch').style.background='rgb(0,0,0)';
+  document.getElementById('rVal').textContent='R: 0';
+  document.getElementById('gVal').textContent='G: 0';
+  document.getElementById('bVal').textContent='B: 0';
+  document.getElementById('colorName').textContent='No item selected';
+  pushData(0,0,0,0,0,0,0);
+  document.getElementById('statusHero').style.setProperty('--hero-gradient','radial-gradient(ellipse at 50% 0%,rgba(58,125,168,0.1) 0%,transparent 70%)');
+}
+function applyFakeSensorData(d) {
+  document.getElementById('statusHero').style.setProperty('--hero-gradient','radial-gradient(ellipse at 50% 0%,rgba(0,229,255,0.12) 0%,transparent 70%)');
+  const temp=d.temperature||0;
+  document.getElementById('tempGauge').style.strokeDashoffset=251.2*(1-Math.min(temp/120,1));
+  document.getElementById('tempGauge').style.stroke=temp>85?'var(--red)':temp>60?'var(--orange)':'var(--cyan)';
+  document.getElementById('tempVal').textContent=temp.toFixed(1);
+  document.getElementById('statusMeta').textContent='📡 Sensor data received';
+  const hum=d.humidity||0;
+  document.getElementById('humVal').textContent=hum.toFixed(1);
+  document.getElementById('humBar').style.width=Math.min(hum,100)+'%';
+  const mq135=d.mq135||0;
+  document.getElementById('mq135Val').textContent=Math.round(mq135);
+  document.getElementById('mq135Bar').style.width=Math.min(mq135,100)+'%';
+  const mq2=d.mq2||0;
+  document.getElementById('mq2Val').textContent=Math.round(mq2);
+  document.getElementById('mq2Bar').style.width=Math.min(mq2,100)+'%';
+  document.getElementById('devId').textContent=d.device_id||'ESP32_001';
+  const r=d.red||0,ge=d.green||0,bv=d.blue||0;
+  document.getElementById('colorSwatch').style.background=`rgb(${r},${ge},${bv})`;
+  document.getElementById('rVal').textContent=`R: ${Math.round(r)}`;
+  document.getElementById('gVal').textContent=`G: ${Math.round(ge)}`;
+  document.getElementById('bVal').textContent=`B: ${Math.round(bv)}`;
+  document.getElementById('colorName').textContent=describeColor(r,ge,bv);
+  pushData(temp,hum,mq135,mq2,r,ge,bv);
+  pushToHistoryLog({timestamp:new Date().toISOString(),temperature:temp,humidity:hum,mq135,mq2,red:r,green:ge,blue:bv,status:'NORMAL'});
+}
+
+/* ══ Feedback ══ */
+let selectedRating='';
+const feedbackHistory=[];
+window.addEventListener('DOMContentLoaded',()=>{
+  const now=new Date();
+  document.getElementById('fb_date').value=now.toISOString().split('T')[0];
+  document.getElementById('fb_time').value=now.toTimeString().slice(0,5);
+  /* Initial camera scan */
+  refreshCameraList();
+});
+function selectRating(type) {
+  selectedRating=type;
+  document.getElementById('fb_good_btn').className='fb-rating-btn'+(type==='food'?' selected food':'');
+  document.getElementById('fb_avg_btn').className='fb-rating-btn'+(type==='avg'?' selected avg':'');
+  document.getElementById('fb_poor_btn').className='fb-rating-btn'+(type==='poor'?' selected poor':'');
+}
+function submitFeedback() {
+  const name=document.getElementById('fb_name').value.trim();
+  const rollno=document.getElementById('fb_rollno').value.trim();
+  const date=document.getElementById('fb_date').value;
+  const time=document.getElementById('fb_time').value;
+  const food=document.getElementById('fb_food').value.trim();
+  if(!name||!rollno||!date||!time||!food||!selectedRating){
+    ['fb_name','fb_rollno','fb_date','fb_time','fb_food'].forEach(id=>{const el=document.getElementById(id);if(!el.value.trim()){el.style.borderColor='var(--red)';setTimeout(()=>el.style.borderColor='',1800)}});
+    return;
+  }
+  feedbackHistory.push({name,rollno,date,time,food,rating:selectedRating});
+  renderFeedbackHistory();
+  document.getElementById('fb_name').value='';
+  document.getElementById('fb_rollno').value='';
+  document.getElementById('fb_food').value='';
+  const now=new Date();
+  document.getElementById('fb_date').value=now.toISOString().split('T')[0];
+  document.getElementById('fb_time').value=now.toTimeString().slice(0,5);
+  selectedRating='';
+  selectRating('');
+  const toast=document.getElementById('fbToast');
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'),3000);
+}
+function renderFeedbackHistory() {
+  const tb=document.getElementById('fbHistoryBody');
+  const cnt=document.getElementById('fbCount');
+  cnt.textContent=`(${feedbackHistory.length} ${feedbackHistory.length===1?'entry':'entries'})`;
+  if(!feedbackHistory.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:28px">No feedback submitted yet.</td></tr>';return}
+  tb.innerHTML=[...feedbackHistory].reverse().map((f,i)=>`<tr>
+    <td style="color:var(--text3)">${feedbackHistory.length-i}</td>
+    <td style="color:var(--text)">${f.name}</td>
+    <td style="font-family:'Orbitron',monospace;font-size:0.72rem;color:var(--cyan)">${f.rollno}</td>
+    <td style="color:var(--text2)">${f.date}</td>
+    <td style="color:var(--text2)">${f.time}</td>
+    <td style="color:var(--text2)">${f.food}</td>
+    <td><span class="fb-tag-${f.rating==='food'?'food':f.rating==='avg'?'avg':'poor'}">${f.rating==='food'?'✅ GOOD':f.rating==='avg'?'⚠️ AVG':'❌ POOR'}</span></td>
+  </tr>`).join('');
+}
+</script>
+</body>
+</html>

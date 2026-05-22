@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>IoT Food Quality Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:#050d1a;--bg2:#091525;--panel:#0d1f35;--panel2:#112240;
+  --border:#1a3a5c;--cyan:#00e5ff;--cyan2:#00b8d4;--green:#00e676;
+  --green2:#00c853;--yellow:#ffea00;--orange:#ff6d00;--red:#ff1744;
+  --purple:#d500f9;--text:#e0f7ff;--text2:#7ec8e3;--text3:#3a7da8;
+  --glow-cyan:0 0 20px rgba(0,229,255,0.4);--glow-green:0 0 20px rgba(0,230,118,0.4);
+  --glow-red:0 0 20px rgba(255,23,68,0.5);--glow-oran:0 0 20px rgba(255,109,0,0.4);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Exo 2',sans-serif;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+
+header{position:relative;padding:24px 32px 20px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(0,229,255,0.06) 0%,transparent 100%);display:flex;align-items:center;justify-content:space-between;z-index:10}
+.logo-wrap{display:flex;align-items:center;gap:16px}
+.logo-icon{width:52px;height:52px;background:linear-gradient(135deg,var(--cyan),var(--purple));border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:var(--glow-cyan);animation:pulse-icon 3s ease-in-out infinite}
+@keyframes pulse-icon{0%,100%{box-shadow:var(--glow-cyan)}50%{box-shadow:0 0 40px rgba(0,229,255,0.7)}}
+.logo-text h1{font-family:'Orbitron',monospace;font-size:1.35rem;font-weight:900;background:linear-gradient(90deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px}
+.logo-text p{font-size:0.72rem;color:var(--text3);letter-spacing:1.5px;margin-top:2px}
+.header-right{display:flex;align-items:center;gap:20px}
+.live-badge{display:flex;align-items:center;gap:8px;background:rgba(0,230,118,0.1);border:1px solid rgba(0,230,118,0.3);padding:6px 16px;border-radius:20px;font-size:0.78rem;color:var(--green);font-family:'Orbitron',monospace;font-weight:700;letter-spacing:1px}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:blink 1.2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+.time-display{font-family:'Orbitron',monospace;font-size:0.85rem;color:var(--text2);letter-spacing:2px}
+
+.item-selector-bar{position:relative;z-index:20;background:linear-gradient(90deg,rgba(0,229,255,0.08),rgba(213,0,249,0.05));border-bottom:1px solid var(--border);padding:10px 32px;display:flex;align-items:center;gap:14px}
+.item-selector-label{font-family:'Orbitron',monospace;font-size:0.72rem;font-weight:700;color:var(--cyan);letter-spacing:1.5px;white-space:nowrap}
+#itemDropdown{background:var(--panel2);border:1px solid var(--cyan2);color:var(--text);padding:7px 14px 7px 10px;border-radius:10px;font-family:'Exo 2',sans-serif;font-size:0.85rem;outline:none;cursor:pointer;min-width:200px;box-shadow:0 0 10px rgba(0,229,255,0.1)}
+#itemDropdown option{background:var(--panel2);color:var(--text)}
+
+main{position:relative;z-index:1;max-width:1500px;margin:0 auto;padding:28px 24px;display:grid;grid-template-columns:340px 1fr;gap:20px}
+@media(max-width:1100px){main{grid-template-columns:1fr}}
+
+.sidebar{display:flex;flex-direction:column;gap:18px}
+.status-hero{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:28px;text-align:center;position:relative;overflow:hidden;transition:all 0.5s ease}
+.status-hero::before{content:'';position:absolute;inset:0;background:var(--hero-gradient,radial-gradient(ellipse at 50% 0%,rgba(0,230,118,0.15) 0%,transparent 70%));transition:background 0.5s ease}
+.gauge-wrap{display:flex;justify-content:center;margin:8px 0}
+.gauge-ring{width:110px;height:110px;position:relative}
+.gauge-ring svg{transform:rotate(-90deg)}
+.gauge-track{fill:none;stroke:var(--panel2);stroke-width:10}
+.gauge-fill{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset 0.8s cubic-bezier(.4,0,.2,1),stroke 0.5s}
+.gauge-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.gauge-val{font-family:'Orbitron',monospace;font-size:1.3rem;font-weight:700}
+.gauge-unit{font-size:0.65rem;color:var(--text3)}
+.status-meta{font-size:0.8rem;color:var(--text3)}
+
+.sensor-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sensor-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px 14px;position:relative;overflow:hidden;transition:border-color 0.3s,transform 0.2s}
+.sensor-card:hover{transform:translateY(-2px);border-color:var(--cyan2)}
+.sensor-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--card-accent,var(--cyan))}
+.sensor-icon{font-size:1.4rem;margin-bottom:8px}
+.sensor-name{font-size:0.65rem;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase}
+.sensor-value{font-family:'Orbitron',monospace;font-size:1.4rem;font-weight:700;color:var(--text);margin:4px 0}
+.sensor-unit{font-size:0.7rem;color:var(--text3)}
+.sensor-bar{margin-top:8px;height:4px;background:var(--panel2);border-radius:2px;overflow:hidden}
+.sensor-bar-fill{height:100%;border-radius:2px;transition:width 0.6s ease,background 0.4s}
+
+.color-card{grid-column:span 2}
+.color-display{display:flex;align-items:center;gap:12px;margin-top:10px}
+.color-swatch{width:48px;height:48px;border-radius:12px;border:2px solid rgba(255,255,255,0.15);box-shadow:0 4px 20px rgba(0,0,0,0.4);transition:background 0.6s ease;flex-shrink:0}
+.color-values{display:flex;flex-direction:column;gap:4px}
+.color-rgb{display:flex;gap:8px}
+.rgb-chip{font-family:'Orbitron',monospace;font-size:0.7rem;padding:3px 8px;border-radius:6px;font-weight:700}
+.rgb-r{background:rgba(255,50,50,0.2);color:#ff6b6b}
+.rgb-g{background:rgba(50,255,100,0.2);color:#69ff84}
+.rgb-b{background:rgba(50,100,255,0.2);color:#69a8ff}
+.color-name{font-size:0.72rem;color:var(--text2)}
+
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:20px;overflow:hidden}
+.panel-head{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(0,229,255,0.03)}
+.panel-title{font-family:'Orbitron',monospace;font-size:0.85rem;font-weight:700;color:var(--cyan);letter-spacing:2px;display:flex;align-items:center;gap:10px}
+.panel-title span{font-size:1.1rem}
+.panel-body{padding:20px 24px}
+
+.chart-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+@media(max-width:900px){.chart-row{grid-template-columns:1fr}}
+.mini-chart{position:relative;height:100px}
+.mini-chart canvas{width:100%!important;height:100%!important}
+.mini-chart-label{font-size:0.7rem;color:var(--text3);margin-bottom:8px;font-family:'Orbitron',monospace;letter-spacing:1px}
+
+.btn{padding:10px 22px;border-radius:10px;border:none;cursor:pointer;font-family:'Orbitron',monospace;font-size:0.78rem;font-weight:700;letter-spacing:1px;transition:all 0.25s;display:flex;align-items:center;gap:8px}
+.btn-cyan{background:linear-gradient(135deg,var(--cyan),var(--cyan2));color:var(--bg)}
+.btn-cyan:hover{box-shadow:var(--glow-cyan);transform:translateY(-1px)}
+.btn-green{background:linear-gradient(135deg,var(--green),var(--green2));color:var(--bg)}
+.btn-green:hover{box-shadow:var(--glow-green);transform:translateY(-1px)}
+.btn-orange{background:linear-gradient(135deg,var(--orange),#ff8f00);color:var(--bg)}
+.btn-red{background:linear-gradient(135deg,var(--red),#c62828);color:#fff}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2)}
+.btn-ghost:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn:disabled{opacity:0.5;cursor:not-allowed;transform:none!important}
+
+.alerts-list{display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto}
+.alert-item{padding:10px 14px;border-radius:10px;display:flex;align-items:center;gap:10px;font-size:0.82rem;animation:fadeIn 0.4s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1}}
+.alert-item.danger{background:rgba(255,23,68,0.1);border:1px solid rgba(255,23,68,0.3);color:#ff6b7a}
+.alert-item.warn{background:rgba(255,234,0,0.08);border:1px solid rgba(255,234,0,0.25);color:#ffe97a}
+.alert-item.ok{background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.25);color:#69ff9a}
+.alert-time{font-size:0.68rem;color:var(--text3);margin-left:auto;flex-shrink:0}
+
+.tabs{display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap}
+.tab{padding:8px 18px;border-radius:8px;cursor:pointer;font-family:'Orbitron',monospace;font-size:0.72rem;font-weight:700;color:var(--text3);border:1px solid transparent;transition:all 0.2s}
+.tab.active{background:rgba(0,229,255,0.1);border-color:var(--cyan2);color:var(--cyan)}
+.tab:hover:not(.active){color:var(--text2);border-color:var(--border)}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+
+.data-table{width:100%;border-collapse:collapse;font-size:0.8rem}
+.data-table th{padding:10px 14px;text-align:left;background:var(--panel2);color:var(--text3);font-family:'Orbitron',monospace;font-size:0.65rem;letter-spacing:1.5px;border-bottom:1px solid var(--border)}
+.data-table td{padding:10px 14px;border-bottom:1px solid rgba(26,58,92,0.5);color:var(--text2)}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tbody tr:hover td{background:rgba(0,229,255,0.03)}
+
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--panel2)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+.progress-wrap{margin-top:12px;display:none}
+.progress-wrap.visible{display:block}
+.progress-bar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--cyan),var(--purple));animation:progress-anim 2s ease-in-out infinite}
+@keyframes progress-anim{0%{width:0%}50%{width:70%}100%{width:100%}}
+
+.sim-row{display:flex;gap:10px;flex-wrap:wrap}
+
+.feedback-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+@media(max-width:700px){.feedback-form-grid{grid-template-columns:1fr}}
+.fb-field{display:flex;flex-direction:column;gap:6px}
+.fb-label{font-size:0.68rem;color:var(--text3);font-family:'Orbitron',monospace;letter-spacing:1.5px;text-transform:uppercase}
+.fb-input{background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:9px 14px;border-radius:10px;font-family:'Exo 2',sans-serif;font-size:0.85rem;outline:none;transition:border-color 0.2s,box-shadow 0.2s;width:100%}
+.fb-input:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(0,229,255,0.12)}
+.fb-input::placeholder{color:var(--text3)}
+.fb-rating-group{display:flex;gap:10px;flex-wrap:wrap}
+.fb-rating-btn{padding:8px 22px;border-radius:8px;cursor:pointer;font-family:'Orbitron',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;border:1px solid var(--border);background:var(--panel2);color:var(--text3);transition:all 0.2s}
+.fb-rating-btn.selected.food{background:rgba(0,230,118,0.2);color:var(--green);border-color:var(--green);box-shadow:var(--glow-green)}
+.fb-rating-btn.selected.avg{background:rgba(255,234,0,0.12);color:var(--yellow);border-color:var(--yellow)}
+.fb-rating-btn.selected.poor{background:rgba(255,23,68,0.15);color:var(--red);border-color:var(--red)}
+.fb-submit-btn{padding:11px 36px;border-radius:10px;border:none;cursor:pointer;font-family:'Orbitron',monospace;font-size:0.82rem;font-weight:700;letter-spacing:1.5px;background:linear-gradient(135deg,var(--cyan),var(--purple));color:var(--bg);transition:all 0.25s;box-shadow:var(--glow-cyan)}
+.fb-submit-btn:hover{transform:translateY(-2px);box-shadow:0 0 30px rgba(0,229,255,0.5)}
+.fb-success-toast{display:none;background:rgba(0,230,118,0.12);border:1px solid rgba(0,230,118,0.4);color:var(--green);padding:10px 18px;border-radius:10px;font-size:0.82rem;margin-top:12px;animation:fadeIn 0.3s ease}
+.fb-success-toast.show{display:block}
+.fb-field-full{grid-column:span 2}
+@media(max-width:700px){.fb-field-full{grid-column:span 1}}
+.fb-table{width:100%;border-collapse:collapse;font-size:0.8rem}
+.fb-table th{padding:10px 14px;text-align:left;background:var(--panel2);color:var(--text3);font-family:'Orbitron',monospace;font-size:0.63rem;letter-spacing:1.5px;border-bottom:1px solid var(--border)}
+.fb-table td{padding:10px 14px;border-bottom:1px solid rgba(26,58,92,0.5);color:var(--text2)}
+.fb-table tr:last-child td{border-bottom:none}
+.fb-table tbody tr:hover td{background:rgba(0,229,255,0.03)}
+.fb-tag-food{background:rgba(0,230,118,0.15);color:var(--green);padding:2px 10px;border-radius:8px;font-family:'Orbitron',monospace;font-size:0.63rem;font-weight:700}
+.fb-tag-avg{background:rgba(255,234,0,0.12);color:var(--yellow);padding:2px 10px;border-radius:8px;font-family:'Orbitron',monospace;font-size:0.63rem;font-weight:700}
+.fb-tag-poor{background:rgba(255,23,68,0.15);color:var(--red);padding:2px 10px;border-radius:8px;font-family:'Orbitron',monospace;font-size:0.63rem;font-weight:700}
+
+/* ═══ IMAGE AI — CAMERA SECTION ═══ */
+.image-ai-layout{display:grid;grid-template-columns:1fr 260px;gap:20px;align-items:start}
+@media(max-width:900px){.image-ai-layout{grid-template-columns:1fr}}
+
+.camera-main-panel{background:var(--panel2);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+
+.cam-device-bar{padding:10px 16px;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.2);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cam-device-label{font-family:'Orbitron',monospace;font-size:0.65rem;color:var(--text3);letter-spacing:1.5px;white-space:nowrap}
+#cameraDeviceSelect{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-family:'Exo 2',sans-serif;font-size:0.8rem;outline:none;cursor:pointer;flex:1;min-width:0;max-width:340px;transition:border-color 0.2s}
+#cameraDeviceSelect:focus,#cameraDeviceSelect:hover{border-color:var(--cyan2)}
+#cameraDeviceSelect option{background:var(--panel2);color:var(--text)}
+.cam-facing-toggle{display:flex;gap:6px}
+.cam-facing-btn{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text3);font-family:'Orbitron',monospace;font-size:0.62rem;cursor:pointer;transition:all 0.2s;white-space:nowrap}
+.cam-facing-btn.active{background:rgba(0,229,255,0.1);border-color:var(--cyan2);color:var(--cyan)}
+.cam-facing-btn:hover:not(.active){border-color:var(--text3);color:var(--text2)}
+.cam-refresh-btn{padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text3);font-size:0.75rem;cursor:pointer;transition:all 0.2s;flex-shrink:0}
+.cam-refresh-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+
+.dataset-sidebar{background:var(--panel2);border:1px solid var(--border);border-radius:16px;padding:20px 16px;display:flex;flex-direction:column;gap:16px}
+.ds-label{font-family:'Orbitron',monospace;font-size:0.68rem;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase}
+#imgConditionSelect{background:var(--panel);border:1px solid var(--cyan2);color:var(--text);padding:10px 12px;border-radius:10px;font-family:'Exo 2',sans-serif;font-size:0.9rem;outline:none;cursor:pointer;width:100%;transition:border-color 0.2s,box-shadow 0.2s}
+#imgConditionSelect:focus{border-color:var(--cyan);box-shadow:var(--glow-cyan)}
+#imgConditionSelect option{background:var(--panel2);color:var(--text)}
+
+.ds-result-badge{display:none;padding:12px 14px;border-radius:12px;font-family:'Orbitron',monospace;font-size:0.9rem;font-weight:900;letter-spacing:1px;text-align:center}
+.ds-result-badge.fresh{display:block;background:rgba(0,230,118,0.15);color:var(--green);border:2px solid var(--green);box-shadow:var(--glow-green)}
+.ds-result-badge.spoiled{display:block;background:rgba(255,23,68,0.15);color:var(--red);border:2px solid var(--red);box-shadow:var(--glow-red)}
+
+.ds-confidence{font-size:0.78rem;color:var(--text3);text-align:center}
+.prob-bars{display:flex;flex-direction:column;gap:6px}
+.prob-row{display:flex;align-items:center;gap:10px}
+.prob-name{font-size:0.72rem;color:var(--text3);width:90px;flex-shrink:0}
+.prob-bar{flex:1;height:6px;background:var(--panel);border-radius:3px;overflow:hidden}
+.prob-fill{height:100%;border-radius:3px;background:var(--cyan);transition:width 0.8s ease}
+.prob-pct{font-size:0.72rem;color:var(--text2);width:38px;text-align:right}
+
+.cam-viewport-wrap{position:relative;background:#000;aspect-ratio:16/9;overflow:hidden}
+#cameraFeed{width:100%;height:100%;object-fit:cover;display:block}
+#capturedCanvas{display:none;width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0}
+.cam-overlay-label{position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.7);border:1px solid var(--cyan2);border-radius:8px;padding:4px 12px;font-family:'Orbitron',monospace;font-size:0.68rem;color:var(--cyan);letter-spacing:1px}
+
+.cam-status-badge{position:absolute;top:12px;right:12px;background:rgba(0,0,0,0.75);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-family:'Orbitron',monospace;font-size:0.62rem;color:var(--text3);letter-spacing:1px;display:flex;align-items:center;gap:6px;transition:all 0.3s}
+.cam-status-badge.active{border-color:var(--green);color:var(--green)}
+.cam-status-badge.error{border-color:var(--red);color:var(--red)}
+.cam-status-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:blink 1.2s ease-in-out infinite}
+
+.cam-no-access{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:var(--panel2);color:var(--text3);font-size:0.85rem;gap:10px;text-align:center;padding:20px}
+.cam-no-access span{font-size:2.5rem}
+
+/* USB tip banner */
+.cam-usb-tip{display:none;background:rgba(0,229,255,0.07);border:1px solid rgba(0,229,255,0.25);border-radius:10px;padding:8px 14px;font-size:0.75rem;color:var(--cyan);margin:0 16px 12px;line-height:1.5}
+.cam-usb-tip.show{display:block}
+
+.cam-controls{padding:16px 20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border);background:rgba(0,0,0,0.2)}
+
+.upload-strip{padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;font-size:0.8rem;color:var(--text3)}
+.upload-strip label{cursor:pointer;padding:7px 16px;border-radius:8px;background:var(--panel);border:1px solid var(--border);color:var(--text2);font-size:0.75rem;transition:border-color 0.2s,color 0.2s}
+.upload-strip label:hover{border-color:var(--cyan);color:var(--cyan)}
+
+@keyframes cam-flash{0%{opacity:0}20%{opacity:0.8}100%{opacity:0}}
+.cam-flash{position:absolute;inset:0;background:white;pointer-events:none;opacity:0}
+.cam-flash.flash{animation:cam-flash 0.4s ease forwards}
+
+.result-img-strip{display:none;align-items:center;gap:14px;padding:14px 20px;border-top:1px solid var(--border);background:rgba(0,0,0,0.15)}
+.result-img-strip.visible{display:flex}
+.result-thumb{width:80px;height:80px;object-fit:cover;border-radius:10px;border:2px solid var(--border)}
+.result-details{flex:1}
+.result-label{font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:700;margin-bottom:4px}
+.result-conf{color:var(--text2);font-size:0.82rem}
+
+.train-section{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.train-status{padding:10px 18px;border-radius:10px;background:var(--panel2);border:1px solid var(--border);font-size:0.8rem;color:var(--text2);flex:1;max-width:500px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.tag{display:inline-block;padding:2px 10px;border-radius:8px;font-family:'Orbitron',monospace;font-size:0.65rem;font-weight:700}
+.tag.NORMAL{background:rgba(0,230,118,0.15);color:var(--green)}
+.tag.SPOILED{background:rgba(255,23,68,0.15);color:var(--red)}
+.tag.OVERCOOKED{background:rgba(255,109,0,0.15);color:var(--orange)}
+.tag.WARNING{background:rgba(255,234,0,0.12);color:var(--yellow)}
+
+.spinner{width:18px;height:18px;border-radius:50%;border:2px solid rgba(0,229,255,0.2);border-top-color:var(--cyan);animation:spin 0.8s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.cam-count-pill{background:rgba(0,229,255,0.1);border:1px solid rgba(0,229,255,0.25);color:var(--cyan);border-radius:20px;padding:3px 10px;font-family:'Orbitron',monospace;font-size:0.62rem;white-space:nowrap}
+
+/* Error message inside viewport */
+.cam-error-msg{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(255,23,68,0.85);color:#fff;font-family:'Orbitron',monospace;font-size:0.68rem;padding:6px 16px;border-radius:8px;white-space:nowrap;display:none}
+.cam-error-msg.show{display:block}
+</style>
+</head>
+<body>
+
+<div class="item-selector-bar">
+  <div class="item-selector-label">🍽️ SELECT ITEM:</div>
+  <select id="itemDropdown" onchange="handleItemSelect(this.value)">
+    <option value="nothing">— Nothing —</option>
+    <option value="rice">🍚 Rice</option>
+    <option value="Bread">🥐 Bread</option>
+    <option value="chicken">🍗 Chicken</option>
+    <option value="lunch_box">🥡 Lunch Box</option>
+    <option value="mixed_rice">🍱 Mixed Rice</option>
+    <option value="drinks">🥤 Drinks</option>
+    <option value="juice">🧃 Juice</option>
+  </select>
+</div>
+
+<header>
+  <div class="logo-wrap">
+    <div class="logo-icon">🥗</div>
+    <div class="logo-text">
+      <h1>FOOD QUALITY MONITOR</h1>
+      <p>IOT DRIVEN SMART MESS TRACKING &amp; EVALUATION SYSTEM</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><div class="live-dot"></div> LIVE MONITORING</div>
+    <div class="time-display" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<main>
+  <div class="sidebar">
+    <div class="status-hero" id="statusHero">
+      <div class="gauge-wrap">
+        <div class="gauge-ring">
+          <svg viewBox="0 0 100 100" width="110" height="110">
+            <circle class="gauge-track" cx="50" cy="50" r="40"/>
+            <circle class="gauge-fill" id="tempGauge" cx="50" cy="50" r="40"
+                    stroke-dasharray="251.2" stroke-dashoffset="251.2" stroke="var(--cyan)"/>
+          </svg>
+          <div class="gauge-center">
+            <div class="gauge-val" id="tempVal">--</div>
+            <div class="gauge-unit">°C TEMP</div>
+          </div>
+        </div>
+      </div>
+      <div class="status-meta" id="statusMeta">Awaiting sensor data...</div>
+    </div>
+
+    <div class="sensor-grid">
+      <div class="sensor-card" style="--card-accent:var(--cyan)">
+        <div class="sensor-icon">💧</div>
+        <div class="sensor-name">Humidity</div>
+        <div class="sensor-value" id="humVal">--</div>
+        <div class="sensor-unit">%</div>
+        <div class="sensor-bar"><div class="sensor-bar-fill" id="humBar" style="width:0%;background:var(--cyan)"></div></div>
+      </div>
+      <div class="sensor-card" style="--card-accent:var(--purple)">
+        <div class="sensor-icon">☁️</div>
+        <div class="sensor-name">MQ-135 GAS</div>
+        <div class="sensor-value" id="mq135Val">--</div>
+        <div class="sensor-unit">% level</div>
+        <div class="sensor-bar"><div class="sensor-bar-fill" id="mq135Bar" style="width:0%;background:var(--purple)"></div></div>
+      </div>
+      <div class="sensor-card" style="--card-accent:var(--orange)">
+        <div class="sensor-icon">🔥</div>
+        <div class="sensor-name">MQ-3 SMOKE</div>
+        <div class="sensor-value" id="mq2Val">--</div>
+        <div class="sensor-unit">% level</div>
+        <div class="sensor-bar"><div class="sensor-bar-fill" id="mq2Bar" style="width:0%;background:var(--orange)"></div></div>
+      </div>
+      <div class="sensor-card" style="--card-accent:var(--green)">
+        <div class="sensor-icon">📡</div>
+        <div class="sensor-name">DEVICE ID</div>
+        <div class="sensor-value" style="font-size:0.7rem;word-break:break-all" id="devId">--</div>
+        <div class="sensor-unit">ESP32</div>
+      </div>
+      <div class="sensor-card color-card" style="--card-accent:var(--yellow)">
+        <div class="sensor-name">TCS3200 — COLOR SENSOR</div>
+        <div class="color-display">
+          <div class="color-swatch" id="colorSwatch"></div>
+          <div class="color-values">
+            <div class="color-rgb">
+              <span class="rgb-chip rgb-r" id="rVal">R: --</span>
+              <span class="rgb-chip rgb-g" id="gVal">G: --</span>
+              <span class="rgb-chip rgb-b" id="bVal">B: --</span>
+            </div>
+            <div class="color-name" id="colorName">Detecting color...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><span>⚡</span> ALERTS</div>
+        <button class="btn btn-ghost" style="padding:5px 12px;font-size:0.68rem" onclick="clearAlerts()">CLEAR</button>
+      </div>
+      <div class="panel-body" style="padding:14px">
+        <div class="alerts-list" id="alertsList">
+          <div class="alert-item ok">✅ System initialized — monitoring active<span class="alert-time">now</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('charts',event)">📊 CHARTS</div>
+      <div class="tab" onclick="switchTab('image',event)">🖼️ IMAGE AI</div>
+      <div class="tab" onclick="switchTab('model',event)">🧠 AI MODEL</div>
+      <div class="tab" onclick="switchTab('simulate',event)">🎛️ SIMULATE</div>
+      <div class="tab" onclick="switchTab('history',event)">📋 HISTORY</div>
+      <div class="tab" onclick="switchTab('feedback',event)">💬 FEEDBACK</div>
+      <div class="tab" onclick="switchTab('aboutme',event)">👨‍💻 ABOUT ME</div>
+    </div>
+
+    <!-- TAB: CHARTS -->
+    <div class="tab-pane active" id="tab-charts">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><span>📈</span> REAL-TIME SENSOR TRENDS</div>
+          <div style="font-size:0.72rem;color:var(--text3);font-family:'Orbitron',monospace">LAST 30 READINGS</div>
+        </div>
+        <div class="panel-body">
+          <div class="chart-row">
+            <div>
+              <div class="mini-chart-label">🌡️ TEMPERATURE (°C)</div>
+              <div class="mini-chart"><canvas id="chartTemp"></canvas></div>
+            </div>
+            <div>
+              <div class="mini-chart-label">☁️ GAS LEVELS (%)</div>
+              <div class="mini-chart"><canvas id="chartGas"></canvas></div>
+            </div>
+            <div>
+              <div class="mini-chart-label">💧 HUMIDITY (%)</div>
+              <div class="mini-chart"><canvas id="chartHum"></canvas></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:20px">
+        <div class="panel-head">
+          <div class="panel-title"><span>🎨</span> COLOR SENSOR TRENDS (RGB)</div>
+        </div>
+        <div class="panel-body">
+          <div style="height:130px"><canvas id="chartRGB"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: IMAGE AI -->
+    <div class="tab-pane" id="tab-image">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><span>🖼️</span> FOOD IMAGE ANALYSIS (AI / CNN)</div>
+          <div id="camCountPill" class="cam-count-pill">SCANNING CAMERAS...</div>
+        </div>
+        <div class="panel-body">
+
+          <!-- USB tip banner -->
+          <div class="cam-usb-tip" id="camUsbTip">
+            🔌 <strong>USB Webcam detected!</strong> Select it from the camera dropdown above, then click <strong>START CAMERA</strong>.
+            If it doesn't appear, click 🔄 Refresh — allow camera permission when the browser asks.
+          </div>
+
+          <div class="image-ai-layout">
+            <!-- LEFT: Camera panel -->
+            <div class="camera-main-panel">
+
+              <!-- CAMERA DEVICE SELECTOR BAR -->
+              <div class="cam-device-bar">
+                <div class="cam-device-label">📷 CAMERA:</div>
+                <select id="cameraDeviceSelect" onchange="onCameraSelectChange(this.value)">
+                  <option value="">— Click Refresh to detect cameras —</option>
+                </select>
+                <div class="cam-facing-toggle">
+                  <button class="cam-facing-btn active" id="facingEnvBtn" onclick="setFacing('environment')" title="Rear / environment camera">🔭 REAR</button>
+                  <button class="cam-facing-btn" id="facingUserBtn" onclick="setFacing('user')" title="Front / selfie camera">🤳 FRONT</button>
+                </div>
+                <button class="cam-refresh-btn" onclick="refreshCameraList()" title="Refresh camera list">🔄</button>
+              </div>
+
+              <!-- Viewport -->
+              <div class="cam-viewport-wrap">
+                <video id="cameraFeed" autoplay playsinline muted></video>
+                <canvas id="capturedCanvas"></canvas>
+                <div class="cam-flash" id="camFlash"></div>
+                <div class="cam-overlay-label" id="camLabel">📷 CAMERA</div>
+                <div class="cam-status-badge" id="camStatusBadge">
+                  <div class="cam-status-dot"></div>
+                  <span id="camStatusText">IDLE</span>
+                </div>
+                <div class="cam-no-access" id="camNoAccess">
+                  <span>📷</span>
+                  <div id="camNoAccessMsg">Camera not available or permission denied.<br>Grant camera access or upload an image below.</div>
+                  <button class="btn btn-ghost" style="margin-top:8px;font-size:0.72rem" onclick="startCamera()">🔄 RETRY</button>
+                </div>
+                <div class="cam-error-msg" id="camErrorMsg"></div>
+              </div>
+
+              <!-- Controls -->
+              <div class="cam-controls">
+                <button class="btn btn-cyan" id="startCamBtn" onclick="startCamera()">
+                  <span>📷</span> START CAMERA
+                </button>
+                <button class="btn btn-green" id="captureBtn" onclick="capturePhoto()" disabled>
+                  <span>📸</span> CAPTURE &amp; ANALYZE
+                </button>
+                <button class="btn btn-ghost" id="retakeBtn" onclick="retakePhoto()" style="display:none">
+                  🔄 RETAKE
+                </button>
+                <button class="btn btn-ghost" id="stopCamBtn" onclick="stopCamera()" style="display:none">
+                  ⏹ STOP CAM
+                </button>
+              </div>
+
+              <!-- Upload strip -->
+              <div class="upload-strip">
+                <span>— or upload image —</span>
+                <label for="fileUploadInput">📂 Choose File</label>
+                <input type="file" id="fileUploadInput" accept="image/*" style="display:none" onchange="handleFileUpload(this)"/>
+                <span id="uploadFileName" style="color:var(--text2);font-size:0.75rem"></span>
+              </div>
+
+              <!-- Result strip -->
+              <div class="result-img-strip" id="resultImgStrip">
+                <img class="result-thumb" id="resultThumb" src="" alt="captured"/>
+                <div class="result-details">
+                  <div class="result-label" id="resultLabel">--</div>
+                  <div class="result-conf" id="resultConf"></div>
+                  <div class="result-conf" id="resultStatus"></div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- RIGHT: Dataset sidebar -->
+            <div class="dataset-sidebar">
+              <div>
+                <div class="ds-label">🔬 Select Dataset</div>
+                <div style="font-size:0.72rem;color:var(--text3);margin:6px 0 10px">Choose before analyzing</div>
+                <select id="imgConditionSelect" onchange="onConditionChange(this.value)">
+                  <option value="">— Select —</option>
+                  <option value="normal">Dataset (Normal)</option>
+                  <option value="abnormal">Datasets (Abnormal)</option>
+                </select>
+              </div>
+
+              <div id="dsDescription" style="font-size:0.75rem;color:var(--text3);line-height:1.6;display:none"></div>
+              <div class="ds-result-badge" id="dsResultBadge"></div>
+              <div class="ds-confidence" id="dsConfidence"></div>
+              <div class="prob-bars" id="probBars"></div>
+              <div id="analyzingRow" style="display:none;align-items:center;gap:8px;color:var(--cyan);font-size:0.8rem">
+                <div class="spinner"></div> Analyzing image...
+              </div>
+              <div id="dsInstructions" style="font-size:0.75rem;color:var(--text3);line-height:1.7;background:rgba(0,229,255,0.04);border:1px solid var(--border);border-radius:10px;padding:12px">
+                <strong style="color:var(--text2)">How to use:</strong><br>
+                1. Click 🔄 Refresh to detect cameras<br>
+                2. Select your camera from the dropdown<br>
+                3. Click START CAMERA<br>
+                4. Select a dataset &amp; capture
+              </div>
+
+              <!-- Detected cameras info -->
+              <div id="camInfoBox" style="background:rgba(0,229,255,0.04);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:0.74rem;color:var(--text3);line-height:1.8">
+                <strong style="color:var(--cyan);font-family:'Orbitron',monospace;font-size:0.65rem;letter-spacing:1px">📷 DETECTED CAMERAS</strong>
+                <div id="camInfoList" style="margin-top:6px">Click 🔄 to scan...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: MODEL -->
+    <div class="tab-pane" id="tab-model">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><span>🧠</span> AI MODEL TRAINING</div>
+        </div>
+        <div class="panel-body">
+          <p style="color:var(--text2);font-size:0.85rem;margin-bottom:16px;line-height:1.6">
+            The system automatically downloads the <strong style="color:var(--cyan)">Moldy Bread Image Dataset</strong> from Kaggle
+            and trains a <strong style="color:var(--cyan)">MobileNetV2 CNN</strong> model to detect food quality from images.
+          </p>
+          <div class="train-section">
+            <button class="btn btn-cyan" onclick="startTraining()" id="trainBtn">⚡ TRAIN MODEL</button>
+            <div class="train-status" id="trainStatus">No model trained yet. Click TRAIN MODEL to start.</div>
+          </div>
+          <div class="progress-wrap" id="progressWrap">
+            <div style="font-size:0.72rem;color:var(--text3);margin-bottom:6px;font-family:'Orbitron',monospace">TRAINING IN PROGRESS...</div>
+            <div class="progress-bar"><div class="progress-fill"></div></div>
+          </div>
+          <div style="margin-top:24px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+            <div style="background:var(--panel2);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center">
+              <div style="font-size:0.65rem;color:var(--text3);font-family:'Orbitron',monospace;letter-spacing:1.5px;margin-bottom:8px">MODEL</div>
+              <div style="font-family:'Orbitron',monospace;color:var(--cyan);font-size:0.9rem;font-weight:700">MobileNetV2</div>
+            </div>
+            <div style="background:var(--panel2);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center">
+              <div style="font-size:0.65rem;color:var(--text3);font-family:'Orbitron',monospace;letter-spacing:1.5px;margin-bottom:8px">ACCURACY</div>
+              <div style="font-family:'Orbitron',monospace;color:var(--green);font-size:0.9rem;font-weight:700" id="accuracyDisplay">--%</div>
+            </div>
+            <div style="background:var(--panel2);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center">
+              <div style="font-size:0.65rem;color:var(--text3);font-family:'Orbitron',monospace;letter-spacing:1.5px;margin-bottom:8px">DATASET</div>
+              <div style="font-family:'Orbitron',monospace;color:var(--purple);font-size:0.9rem;font-weight:700">KAGGLE</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: SIMULATE -->
+    <div class="tab-pane" id="tab-simulate">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><span>🎛️</span> SIMULATE SENSOR DATA</div>
+        </div>
+        <div class="panel-body">
+          <p style="color:var(--text2);font-size:0.82rem;margin-bottom:18px">Simulate different food conditions to test the system without physical hardware.</p>
+          <div class="sim-row">
+            <button class="btn btn-green" onclick="simulate('normal')">✅ NORMAL FOOD</button>
+            <button class="btn" style="background:linear-gradient(135deg,var(--red),#c62828);color:#fff" onclick="simulate('spoiled')">🦠 SPOILED</button>
+            <button class="btn" style="background:linear-gradient(135deg,var(--yellow),#f9a825);color:var(--bg)" onclick="simulate('warning')">⚠️ WARNING</button>
+          </div>
+          <div style="margin-top:24px">
+            <div style="font-family:'Orbitron',monospace;font-size:0.78rem;color:var(--cyan);letter-spacing:2px;margin-bottom:14px">⚙️ THRESHOLD CONFIG</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <label style="font-size:0.72rem;color:var(--text3)">MQ-135 Spoilage Threshold (%)</label>
+                <input type="range" min="20" max="90" value="60" oninput="this.nextElementSibling.textContent=this.value" style="width:100%;margin:6px 0;accent-color:var(--purple)"/>
+                <span style="font-size:0.75rem;color:var(--purple);font-family:'Orbitron',monospace">60</span>
+              </div>
+              <div>
+                <label style="font-size:0.72rem;color:var(--text3)">MQ-2 Smoke Threshold (%)</label>
+                <input type="range" min="20" max="90" value="55" oninput="this.nextElementSibling.textContent=this.value" style="width:100%;margin:6px 0;accent-color:var(--orange)"/>
+                <span style="font-size:0.75rem;color:var(--orange);font-family:'Orbitron',monospace">55</span>
+              </div>
+              <div>
+                <label style="font-size:0.72rem;color:var(--text3)">Max Safe Temperature (°C)</label>
+                <input type="range" min="40" max="120" value="75" oninput="this.nextElementSibling.textContent=this.value" style="width:100%;margin:6px 0;accent-color:var(--cyan)"/>
+                <span style="font-size:0.75rem;color:var(--cyan);font-family:'Orbitron',monospace">75</span>
+              </div>
+              <div>
+                <label style="font-size:0.72rem;color:var(--text3)">Max Humidity (%)</label>
+                <input type="range" min="50" max="100" value="90" oninput="this.nextElementSibling.textContent=this.value" style="width:100%;margin:6px 0;accent-color:var(--cyan2)"/>
+                <span style="font-size:0.75rem;color:var(--cyan2);font-family:'Orbitron',monospace">90</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: HISTORY -->
+    <div class="tab-pane" id="tab-history">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><span>📋</span> SENSOR HISTORY LOG</div>
+          <button class="btn btn-ghost" style="padding:5px 14px;font-size:0.68rem" onclick="loadHistory()">↻ REFRESH</button>
+        </div>
+        <div class="panel-body" style="padding:0;overflow-x:auto">
+          <table class="data-table" id="historyTable">
+            <thead>
+              <tr><th>TIME</th><th>TEMP °C</th><th>HUM %</th><th>MQ-135</th><th>MQ-2</th><th>COLOR</th></tr>
+            </thead>
+            <tbody id="historyBody">
+              <tr><td colspan="6" style="text-align:center;color:var(--text3);padding:30px">No data yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: FEEDBACK -->
+    <div class="tab-pane" id="tab-feedback">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><span>💬</span> FOOD FEEDBACK FORM</div>
+          <div style="font-size:0.72rem;color:var(--text3);font-family:'Orbitron',monospace">SUBMIT YOUR REVIEW</div>
+        </div>
+        <div class="panel-body">
+          <div class="feedback-form-grid">
+            <div class="fb-field">
+              <label class="fb-label" for="fb_name">👤 Name</label>
+              <input class="fb-input" type="text" id="fb_name" placeholder="Enter your name"/>
+            </div>
+            <div class="fb-field">
+              <label class="fb-label" for="fb_rollno">🎓 Roll No</label>
+              <input class="fb-input" type="text" id="fb_rollno" placeholder="Enter roll number"/>
+            </div>
+            <div class="fb-field">
+              <label class="fb-label" for="fb_date">📅 Date</label>
+              <input class="fb-input" type="date" id="fb_date"/>
+            </div>
+            <div class="fb-field">
+              <label class="fb-label" for="fb_time">⏰ Time</label>
+              <input class="fb-input" type="time" id="fb_time"/>
+            </div>
+            <div class="fb-field fb-field-full">
+              <label class="fb-label" for="fb_food">🍽️ Food Item</label>
+              <input class="fb-input" type="text" id="fb_food" placeholder="e.g. Bread, Lunch Box, Drink, Puff..."/>
+            </div>
+            <div class="fb-field fb-field-full">
+              <label class="fb-label">⭐ Rating</label>
+              <div class="fb-rating-group">
+                <button class="fb-rating-btn" id="fb_good_btn" onclick="selectRating('food')">✅ GOOD</button>
+                <button class="fb-rating-btn" id="fb_avg_btn"  onclick="selectRating('avg')">⚠️ AVERAGE</button>
+                <button class="fb-rating-btn" id="fb_poor_btn" onclick="selectRating('poor')">❌ POOR</button>
+              </div>
+            </div>
+          </div>
+          <button class="fb-submit-btn" onclick="submitFeedback()">📨 SUBMIT FEEDBACK</button>
+          <div class="fb-success-toast" id="fbToast">✅ Feedback submitted successfully!</div>
+          <div class="feedback-history-wrap" style="margin-top:24px">
+            <div style="font-family:'Orbitron',monospace;font-size:0.78rem;font-weight:700;color:var(--cyan);letter-spacing:2px;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+              <span>📜</span> FEEDBACK HISTORY
+              <span style="font-size:0.65rem;color:var(--text3);font-weight:400;letter-spacing:1px" id="fbCount">(0 entries)</span>
+            </div>
+            <div style="overflow-x:auto">
+              <table class="fb-table">
+                <thead><tr><th>#</th><th>NAME</th><th>ROLL NO</th><th>DATE</th><th>TIME</th><th>FOOD ITEM</th><th>RATING</th></tr></thead>
+                <tbody id="fbHistoryBody">
+                  <tr><td colspan="7" style="text-align:center;color:var(--text3);padding:28px">No feedback submitted yet.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: ABOUT ME -->
+    <div class="tab-pane" id="tab-aboutme">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><span>👨‍💻</span> ABOUT THE PROJECT</div>
+          <div style="font-size:0.72rem;color:var(--text3);font-family:'Orbitron',monospace">IoT-Driven Smart Meal Quality Tracking</div>
+        </div>
+        <div class="panel-body">
+          <div style="background:linear-gradient(135deg,rgba(0,229,255,0.08),rgba(213,0,249,0.06));border:1px solid var(--border);border-radius:16px;padding:24px 28px;margin-bottom:24px;position:relative;overflow:hidden">
+            <div style="position:absolute;top:-20px;right:-20px;font-size:6rem;opacity:0.06;pointer-events:none">🥗</div>
+            <div style="font-family:'Orbitron',monospace;font-size:1.05rem;font-weight:900;background:linear-gradient(90deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px;margin-bottom:10px">IoT-Driven Smart Meal Quality Tracking And Evaluation System</div>
+            <p style="color:var(--text2);font-size:0.88rem;line-height:1.75">
+              Our project monitors meal quality using sensors and image-based analysis. We use the <strong style="color:var(--purple)">MQ-135 Gas Sensor</strong> for spoilage smell, <strong style="color:var(--orange)">MQ-3 Gas Sensor</strong> for smoke/combustion, <strong style="color:var(--yellow)">TCS3200 Color Sensor</strong> for visual analysis, and <strong style="color:var(--cyan)">DHT11 Sensor</strong> for temperature/humidity. The <strong style="color:var(--green)">AI Camera module</strong> uses a trained MobileNetV2 CNN to detect fungus and classify food as FRESH or NOT FRESH.
+            </p>
+          </div>
+          <div style="font-family:'Orbitron',monospace;font-size:0.78rem;color:var(--cyan);letter-spacing:2px;margin-bottom:16px">⚙️ SYSTEM COMPONENTS</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:28px">
+            <div style="background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--purple);border-radius:14px;padding:18px 20px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:1.5rem">☁️</span><div><div style="font-family:'Orbitron',monospace;font-size:0.78rem;font-weight:700;color:var(--purple)">MQ-135 Aroma Sensor</div><div style="font-size:0.65rem;color:var(--text3)">AIR QUALITY / SPOILAGE DETECTION</div></div></div>
+              <p style="font-size:0.82rem;color:var(--text2);line-height:1.65">0–25% → FRESH, 26–55% → WARNING, 56–100% → SPOILED.</p>
+            </div>
+            <div style="background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--orange);border-radius:14px;padding:18px 20px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:1.5rem">🔥</span><div><div style="font-family:'Orbitron',monospace;font-size:0.78rem;font-weight:700;color:var(--orange)">MQ-3 Smoke/Gas Sensor</div><div style="font-size:0.65rem;color:var(--text3)">SMOKE / OVERCOOKING DETECTION</div></div></div>
+              <p style="font-size:0.82rem;color:var(--text2);line-height:1.65">0–20% → NORMAL, 21–50% → WARNING, 51–100% → OVERCOOKED.</p>
+            </div>
+            <div style="background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--yellow);border-radius:14px;padding:18px 20px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:1.5rem">🎨</span><div><div style="font-family:'Orbitron',monospace;font-size:0.78rem;font-weight:700;color:var(--yellow)">TCS3200 Color Sensor</div><div style="font-size:0.65rem;color:var(--text3)">VISUAL FOOD CONDITION ANALYSIS</div></div></div>
+              <p style="font-size:0.82rem;color:var(--text2);line-height:1.65">RGB values identify visual condition. Green shift = mold, dark brown = overcooked.</p>
+            </div>
+            <div style="background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--cyan);border-radius:14px;padding:18px 20px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:1.5rem">🌡️</span><div><div style="font-family:'Orbitron',monospace;font-size:0.78rem;font-weight:700;color:var(--cyan)">DHT11 Temp &amp; Humidity</div><div style="font-size:0.65rem;color:var(--text3)">FOOD PRESERVATION ANALYSIS</div></div></div>
+              <p style="font-size:0.82rem;color:var(--text2);line-height:1.65">Rice ~72°C, Puff ~65°C, Chicken ~85°C. Humidity: &lt;65% NORMAL.</p>
+            </div>
+            <div style="background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:14px;padding:18px 20px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:1.5rem">🧠</span><div><div style="font-family:'Orbitron',monospace;font-size:0.78rem;font-weight:700;color:var(--green)">AI Image Analysis (CNN)</div><div style="font-size:0.65rem;color:var(--text3)">FUNGUS / MOLD DETECTION</div></div></div>
+              <p style="font-size:0.82rem;color:var(--text2);line-height:1.65">MobileNetV2 — 93.8% accuracy, 5 epochs, 2400 images. Supports USB webcam + built-in cameras.</p>
+            </div>
+          </div>
+          <div style="background:rgba(0,229,255,0.04);border:1px solid var(--border);border-radius:12px;padding:14px 20px;font-size:0.8rem;color:var(--text3);line-height:1.7">
+            💡 <strong style="color:var(--text2)">Project Goal:</strong> Build a reliable, automated system that helps mess administrators and students monitor food safety in real time — reducing health risks caused by spoiled or sub-standard food.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+'use strict';
+
+/* ══ Chart.js defaults ══ */
+Chart.defaults.color = '#7ec8e3';
+Chart.defaults.borderColor = '#1a3a5c';
+Chart.defaults.font.family = "'Exo 2', sans-serif";
+
+const MAX_POINTS = 30;
+const labels = Array(MAX_POINTS).fill('');
+const dTemp = Array(MAX_POINTS).fill(null);
+const dHum  = Array(MAX_POINTS).fill(null);
+const dMQ135= Array(MAX_POINTS).fill(null);
+const dMQ2  = Array(MAX_POINTS).fill(null);
+const dR    = Array(MAX_POINTS).fill(null);
+const dG    = Array(MAX_POINTS).fill(null);
+const dB    = Array(MAX_POINTS).fill(null);
+
+function mkSparkline(id, label, color, data) {
+  return new Chart(document.getElementById(id), {
+    type: 'line',
+    data: { labels, datasets: [{ label, data, borderColor: color, backgroundColor: color+'18', borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true }] },
+    options: { animation: false, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: true, grid: { color: '#1a3a5c55' }, ticks: { font: { size: 9 }, maxTicksLimit: 4 } } } }
+  });
+}
+const chartTemp = mkSparkline('chartTemp','Temp','#00e5ff',dTemp);
+const chartGas = new Chart(document.getElementById('chartGas'), {
+  type:'line', data: { labels, datasets: [
+    { label:'MQ-135', data:dMQ135, borderColor:'#d500f9', backgroundColor:'#d500f918', borderWidth:2, pointRadius:0, tension:0.4, fill:true },
+    { label:'MQ-2',   data:dMQ2,   borderColor:'#ff6d00', backgroundColor:'#ff6d0018', borderWidth:2, pointRadius:0, tension:0.4, fill:true }
+  ]},
+  options:{ animation:false, responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true, labels:{ boxWidth:10, font:{ size:10 } } } }, scales:{ x:{ display:false }, y:{ display:true, grid:{ color:'#1a3a5c55' }, ticks:{ font:{ size:9 }, maxTicksLimit:4 } } } }
+});
+const chartHum = mkSparkline('chartHum','Hum','#00e676',dHum);
+const chartRGB = new Chart(document.getElementById('chartRGB'), {
+  type:'line', data:{ labels, datasets:[
+    { label:'Red',   data:dR, borderColor:'#ff6b6b', backgroundColor:'#ff6b6b18', borderWidth:2, pointRadius:0, tension:0.4 },
+    { label:'Green', data:dG, borderColor:'#69ff84', backgroundColor:'#69ff8418', borderWidth:2, pointRadius:0, tension:0.4 },
+    { label:'Blue',  data:dB, borderColor:'#69a8ff', backgroundColor:'#69a8ff18', borderWidth:2, pointRadius:0, tension:0.4 }
+  ]},
+  options:{ animation:false, responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true, labels:{ boxWidth:10, font:{ size:10 } } } }, scales:{ x:{ display:false }, y:{ display:true, min:0, max:255, grid:{ color:'#1a3a5c55' }, ticks:{ font:{ size:9 }, maxTicksLimit:4 } } } }
+});
+
+function pushData(t,h,q135,q2,r,g,b) {
+  const now = new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  [dTemp,dHum,dMQ135,dMQ2,dR,dG,dB].forEach(a=>a.shift()); labels.shift();
+  dTemp.push(t); dHum.push(h); dMQ135.push(q135); dMQ2.push(q2);
+  dR.push(r); dG.push(g); dB.push(b); labels.push(now);
+  [chartTemp,chartGas,chartHum,chartRGB].forEach(c=>c.update('none'));
+}
+
+/* ══ Clock ══ */
+setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB',{hour12:false}); }, 1000);
+
+/* ══ Tabs ══ */
+function switchTab(id, event) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  if(event && event.target) event.target.classList.add('active');
+  if(id==='history') loadHistory();
+  if(id==='image') setTimeout(()=>{ refreshCameraList(); }, 300);
+}
+
+/* ════════════════════════════════════════════════════
+   CAMERA SYSTEM — Full USB + built-in + mobile support
+   FIX: uses `ideal` not `exact` for deviceId to avoid
+   OverconstrainedError on USB webcams. Falls back to
+   any camera if the selected device fails.
+════════════════════════════════════════════════════ */
+
+let cameraStream   = null;
+let cameraDevices  = [];
+let activeFacing   = 'environment';
+let activeDeviceId = null;
+let isStarting     = false; // prevents double-start race
+
+function setCamStatus(state, text) {
+  const badge = document.getElementById('camStatusBadge');
+  badge.className = 'cam-status-badge' + (state ? ' ' + state : '');
+  document.getElementById('camStatusText').textContent = text;
+}
+
+function showCamError(msg, durationMs) {
+  const el = document.getElementById('camErrorMsg');
+  el.textContent = msg;
+  el.classList.add('show');
+  if(durationMs) setTimeout(()=>el.classList.remove('show'), durationMs);
+}
+
+/* ── Enumerate all video input devices ── */
+async function refreshCameraList() {
+  const sel      = document.getElementById('cameraDeviceSelect');
+  const pill     = document.getElementById('camCountPill');
+  const infoList = document.getElementById('camInfoList');
+  const usbTip   = document.getElementById('camUsbTip');
+
+  pill.textContent = 'SCANNING...';
+  infoList.textContent = 'Scanning devices...';
+  sel.innerHTML = '<option value="">— Scanning... —</option>';
+
+  try {
+    /* Step 1 — Request camera permission so device labels are revealed.
+       We ask for the lowest-possible resolution to minimise resource use. */
+    let permStream = null;
+    try {
+      permStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 320 }, height: { ideal: 240 } },
+        audio: false
+      });
+    } catch(e) {
+      // Permission already granted, or no camera at all — continue
+    }
+
+    /* Step 2 — Enumerate */
+    const allDevices = await navigator.mediaDevices.enumerateDevices();
+    cameraDevices = allDevices.filter(d => d.kind === 'videoinput');
+
+    /* Release the permission-probe stream */
+    if(permStream) permStream.getTracks().forEach(t => t.stop());
+
+    /* Step 3 — Rebuild dropdown */
+    sel.innerHTML = '';
+    if(cameraDevices.length === 0) {
+      sel.innerHTML = '<option value="">No cameras found — plug in USB cam &amp; click 🔄</option>';
+      pill.textContent = '0 CAMERAS';
+      infoList.innerHTML = '⚠️ No video input devices found.<br>Plug in your USB webcam and click 🔄 Refresh.';
+      usbTip.classList.remove('show');
+      return;
+    }
+
+    let hasUsb = false;
+    cameraDevices.forEach((dev, idx) => {
+      const opt   = document.createElement('option');
+      opt.value   = dev.deviceId;
+      const label = dev.label || `Camera ${idx + 1} (ID: ${dev.deviceId.slice(0,8)}...)`;
+      opt.textContent = label;
+      if(activeDeviceId && dev.deviceId === activeDeviceId) opt.selected = true;
+      sel.appendChild(opt);
+
+      const lbl = label.toLowerCase();
+      if(lbl.includes('usb') || lbl.includes('webcam') || lbl.includes('logitech') ||
+         lbl.includes('creative') || lbl.includes('microsoft') || lbl.includes('razer') ||
+         lbl.includes('a4tech') || lbl.includes('genius')) {
+        hasUsb = true;
+      }
+    });
+
+    /* Auto-select first if nothing is active */
+    if(!activeDeviceId && cameraDevices.length > 0) {
+      sel.selectedIndex = 0;
+    }
+
+    const count = cameraDevices.length;
+    pill.textContent = count + ' CAMERA' + (count !== 1 ? 'S' : '') + ' FOUND';
+    if(hasUsb) usbTip.classList.add('show');
+    else usbTip.classList.remove('show');
+
+    /* Render info list */
+    infoList.innerHTML = cameraDevices.map((d, i) => {
+      const lbl  = d.label || `Camera ${i+1}`;
+      const low  = lbl.toLowerCase();
+      const icon = low.includes('front') || low.includes('user')             ? '🤳' :
+                   low.includes('back')  || low.includes('rear') || low.includes('environment') ? '🔭' :
+                   low.includes('usb')   || low.includes('webcam')           ? '🔌' :
+                   low.includes('ir')                                        ? '🌡️' : '📷';
+      return `<div style="padding:2px 0">${icon} ${lbl}</div>`;
+    }).join('');
+
+  } catch(err) {
+    sel.innerHTML = '<option value="">Permission denied — allow camera &amp; retry</option>';
+    pill.textContent = 'NO ACCESS';
+    infoList.innerHTML = '⚠️ Camera permission denied.<br>Allow camera access in browser settings.';
+    console.warn('Camera enumeration error:', err);
+  }
+}
+
+/* ── Called when user changes the dropdown ── */
+function onCameraSelectChange(deviceId) {
+  activeDeviceId = deviceId || null;
+  /* If camera is already running, restart with new device */
+  if(cameraStream) {
+    startCamera();
+  }
+}
+
+/* ── Facing mode toggle ── */
+async function setFacing(facing) {
+  activeFacing = facing;
+  document.getElementById('facingEnvBtn').className = 'cam-facing-btn' + (facing === 'environment' ? ' active' : '');
+  document.getElementById('facingUserBtn').className = 'cam-facing-btn' + (facing === 'user' ? ' active' : '');
+  /* Only restart if already running */
+  if(cameraStream) await startCamera();
+}
+
+/* ── Build getUserMedia constraints ──
+   KEY FIX: use `ideal` for deviceId instead of `exact`.
+   `exact` throws OverconstrainedError on many USB cameras.
+   `ideal` asks for the preferred device but falls back gracefully. */
+function buildConstraints(deviceId) {
+  const base = { width: { ideal: 1280 }, height: { ideal: 720 } };
+
+  if(deviceId) {
+    /* Prefer the selected device; don't hard-fail if it can't match exactly */
+    return {
+      video: { ...base, deviceId: { ideal: deviceId } },
+      audio: false
+    };
+  }
+
+  /* No device selected — use facing mode (good for mobile front/back) */
+  return {
+    video: { ...base, facingMode: { ideal: activeFacing } },
+    audio: false
+  };
+}
+
+/* ── Start camera — main entry point ── */
+async function startCamera() {
+  if(isStarting) return; // prevent concurrent starts
+  isStarting = true;
+
+  const video     = document.getElementById('cameraFeed');
+  const canvas    = document.getElementById('capturedCanvas');
+  const noAccess  = document.getElementById('camNoAccess');
+  const camLabel  = document.getElementById('camLabel');
+  const errMsg    = document.getElementById('camErrorMsg');
+
+  /* Stop any existing stream first */
+  _stopStream();
+
+  canvas.style.display = 'none';
+  video.style.display  = 'block';
+  noAccess.style.display = 'none';
+  errMsg.classList.remove('show');
+  setCamStatus('', 'CONNECTING...');
+
+  /* Determine which deviceId to use */
+  const selVal   = document.getElementById('cameraDeviceSelect').value;
+  const deviceId = activeDeviceId || selVal || null;
+  const constraints = buildConstraints(deviceId);
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    cameraStream = stream;
+    video.srcObject = stream;
+
+    /* Wait for video metadata to load before calling play() */
+    await new Promise((resolve, reject) => {
+      video.onloadedmetadata = resolve;
+      video.onerror = reject;
+      setTimeout(reject, 8000); // 8 s timeout
+    });
+    await video.play();
+
+    /* Read back which device actually got activated */
+    const track    = stream.getVideoTracks()[0];
+    const settings = track.getSettings();
+    activeDeviceId = settings.deviceId || deviceId;
+
+    /* Sync dropdown to the actual device */
+    if(activeDeviceId) {
+      const sel = document.getElementById('cameraDeviceSelect');
+      for(const opt of sel.options) {
+        if(opt.value === activeDeviceId) { opt.selected = true; break; }
+      }
+    }
+
+    /* Update label */
+    const trackLabel = track.label || 'Camera';
+    const lbl = trackLabel.toLowerCase();
+    const isUsb   = lbl.includes('usb')  || lbl.includes('webcam');
+    const isFront = activeFacing === 'user' || lbl.includes('front') || lbl.includes('user');
+    const isRear  = activeFacing === 'environment' || lbl.includes('back') || lbl.includes('rear');
+    if(isUsb)        camLabel.textContent = '🔌 USB WEBCAM';
+    else if(isFront) camLabel.textContent = '🤳 FRONT CAM';
+    else if(isRear)  camLabel.textContent = '🔭 REAR CAM';
+    else             camLabel.textContent = '📷 ' + trackLabel.split('(')[0].trim().toUpperCase().slice(0,24);
+
+    setCamStatus('active', 'LIVE');
+
+    document.getElementById('startCamBtn').style.display  = 'none';
+    document.getElementById('stopCamBtn').style.display   = 'flex';
+    document.getElementById('captureBtn').disabled        = false;
+    document.getElementById('retakeBtn').style.display    = 'none';
+
+    /* Re-enumerate to pick up any label changes now that we have permission */
+    await refreshCameraList();
+
+  } catch(err) {
+    console.error('Camera start error:', err.name, err.message);
+    _stopStream();
+
+    let userMsg = 'Camera error — check connection and try again.';
+    if(err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      userMsg = 'Camera permission denied.\nAllow camera access in browser settings.';
+      document.getElementById('camNoAccessMsg').innerHTML =
+        '⛔ Camera permission denied.<br>Click the camera icon in your browser address bar to allow access, then click Retry.';
+    } else if(err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+      userMsg = 'No camera found. Plug in your USB webcam and click 🔄 Refresh.';
+      document.getElementById('camNoAccessMsg').innerHTML =
+        '🔌 No camera found.<br>Plug in your USB webcam, click 🔄 Refresh, then select it from the dropdown.';
+    } else if(err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+      userMsg = 'Camera is in use by another app. Close other apps using the camera and retry.';
+      document.getElementById('camNoAccessMsg').innerHTML =
+        '🚫 Camera busy.<br>Another application is using the camera. Close it and retry.';
+    } else if(err.name === 'OverconstrainedError') {
+      userMsg = 'Camera settings not supported. Trying default camera...';
+      // Retry with no constraints (pure fallback)
+      isStarting = false;
+      activeDeviceId = null;
+      document.getElementById('cameraDeviceSelect').value = '';
+      await startCamera();
+      return;
+    }
+
+    noAccess.style.display = 'flex';
+    showCamError(err.name, 5000);
+    setCamStatus('error', err.name === 'NotAllowedError' ? 'DENIED' : 'ERROR');
+    camLabel.textContent = '📷 CAMERA';
+    document.getElementById('captureBtn').disabled = true;
+  } finally {
+    isStarting = false;
+  }
+}
+
+/* ── Internal: stop tracks without touching UI ── */
+function _stopStream() {
+  if(cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  const video = document.getElementById('cameraFeed');
+  if(video.srcObject) {
+    video.srcObject = null;
+  }
+}
+
+/* ── Public stop — updates UI ── */
+function stopCamera() {
+  _stopStream();
+  setCamStatus('', 'IDLE');
+  document.getElementById('startCamBtn').style.display  = 'flex';
+  document.getElementById('stopCamBtn').style.display   = 'none';
+  document.getElementById('captureBtn').disabled        = true;
+  document.getElementById('camLabel').textContent       = '📷 CAMERA';
+  document.getElementById('cameraFeed').style.display   = 'block';
+  document.getElementById('capturedCanvas').style.display = 'none';
+  document.getElementById('retakeBtn').style.display    = 'none';
+  document.getElementById('captureBtn').style.display   = 'flex';
+}
+
+/* ── Capture photo from live video ── */
+function capturePhoto() {
+  if(!cameraStream) return;
+  const video  = document.getElementById('cameraFeed');
+  const canvas = document.getElementById('capturedCanvas');
+  const flash  = document.getElementById('camFlash');
+
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+
+  /* Mirror if front-facing */
+  if(activeFacing === 'user') {
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  if(activeFacing === 'use
